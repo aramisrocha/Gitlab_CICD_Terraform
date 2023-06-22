@@ -1,0 +1,55 @@
+image:
+  name: hashicorp/terraform:light
+  entrypoint:
+    - '/usr/bin/env'
+    - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+    - 'AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}'
+    - 'AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}'
+
+cache:
+  paths:
+    - .terraform
+
+before_script:
+  - terraform --version
+  - terraform init -upgrade
+  - terraform init -reconfigure --backend-config="bucket=aramis-aws-terraform-remote-state-dev" -backend-config="key=ec2/ec2provider.tfstatee" -backend-config="region=us-east-2" -backend-config="access_key=${AWS_ACCESS_KEY_ID}" -backend-config="secret_key=${AWS_SECRET_ACCESS_KEY}"
+
+
+stages:
+  - validar
+  - plan
+  - apply
+  - destroy
+
+
+validar:
+  stage: validar
+  script:
+    - terraform validate
+    - terraform init
+  only:
+    - dev
+
+plan:
+  stage: plan
+  script:
+    - terraform plan
+  only:
+    - dev
+
+apply:
+  stage: apply
+  script:
+    - terraform init
+    - terraform apply $TF_CLI_ARGS $TF_PLAN_FILE -auto-approve
+  rules:
+   - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_REF_NAME == "apply" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+
+
+destroy:
+  stage: destroy
+  script:
+    - terraform destroy $TF_CLI_ARGS -auto-approve
+  rules: 
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_REF_NAME == "destroy" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
