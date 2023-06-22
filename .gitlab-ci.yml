@@ -1,3 +1,5 @@
+
+# Imagem Utilizada para permitir que o Gitlab acesse sua conta AWS
 image:
   name: hashicorp/terraform:light
   entrypoint:
@@ -10,19 +12,21 @@ cache:
   paths:
     - .terraform
 
+# Definindo o backend do terraform para armazenar o tfstate do terraform em um bucket do S3 na AWS, essa
+#Configuração é essencial para centralizar todas as alteraçoes feitas na sua conta AWS
 before_script:
   - terraform --version
   - terraform init -upgrade
   - terraform init -reconfigure --backend-config="bucket=aramis-aws-terraform-remote-state-dev" -backend-config="key=ec2/ec2provider.tfstatee" -backend-config="region=us-east-2" -backend-config="access_key=${AWS_ACCESS_KEY_ID}" -backend-config="secret_key=${AWS_SECRET_ACCESS_KEY}"
 
-
+# Definindo  stage de impleentação
 stages:
   - validar
   - plan
   - apply
   - destroy
 
-
+# No caso do validate sera executado somente o terraform validate para validar o codigo terraform
 validar:
   stage: validar
   script:
@@ -30,7 +34,8 @@ validar:
     - terraform init
   only:
     - dev
-
+# Terraform plan ira executar o terraform plan para validar as alterações do seu codigo terraform no ambiente
+#Lembrando que essas alterações so ocorrem quando é feito o commit na branch dev
 plan:
   stage: plan
   script:
@@ -38,6 +43,9 @@ plan:
   only:
     - dev
 
+
+# Para aplicar a configuração apos a validação é necessario fazer o commit na branch apply e em seguida no gotlab
+#Criar e aprovar um merge request da branch apply para a main, lembrando somente o owner pode ajustar isso
 apply:
   stage: apply
   script:
@@ -46,7 +54,8 @@ apply:
   rules:
    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_REF_NAME == "apply" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
 
-
+# No caso do destroy é necessario fazer um commit na branch destroy e em seguida criar e aprovar 
+# um merge resquest entre a branch destroy e a main, o destroy ira consultar o tfstate que esta no S3
 destroy:
   stage: destroy
   script:
